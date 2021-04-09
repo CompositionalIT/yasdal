@@ -54,8 +54,8 @@ module Mappers =
 let connectionString = @"Server=(localdb)\MSSQLLocalDB;Database=AdventureWorks"
 
 // Basic queries for single fields
-let listOfStrings = Db.Fetch (connectionString, "SELECT DISTINCT NAME FROM Production.Product", (fun r -> r.string "Name"))
-let listOfInts = Db.Fetch (connectionString, "SELECT DISTINCT ProductId FROM Production.Product", (fun r -> r.int "ProductId"))
+let listOfStrings = Db.Fetch (connectionString, "SELECT DISTINCT NAME FROM Production.Product", fun r -> r.string "Name")
+let listOfInts = Db.Fetch (connectionString, "SELECT DISTINCT ProductId FROM Production.Product", fun r -> r.int "ProductId")
 
 // Basic query of a full object
 let productsAlone = Db.Fetch (connectionString, "SELECT * FROM Production.Product", Mappers.toProduct)

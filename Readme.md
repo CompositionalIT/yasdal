@@ -25,7 +25,7 @@ This is the approach taken by Yasdal. You map directly from a lightweight abstra
 ## Reading Data
 Yasdal has a small surface area for reading:
 
-### `Fetch` (reading a collection of records)
+### Fetch (reading a collection of records)
 
 ```SQL
 SELECT * FROM Production.Product
@@ -48,7 +48,7 @@ let results = // Task<Product array>
     Db.Fetch(
         connectionString,
         "SELECT * FROM Production.Product",
-        fun pead p>
+        fun read ->
             {
                 Name = read.string "Name"
                 ProductNumber = read.string "ProductNumber"
