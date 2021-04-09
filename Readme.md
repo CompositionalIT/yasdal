@@ -77,7 +77,7 @@ In code, you should then construct your F# records by e.g. joining the data toge
 
 > There are overloads for 2, 3 and 4 result sets.
 
-#### Parameterisation
+### Parameterisation
 Since Yasdal is just a wrapper on top of Dapper, you can use the same technique for parameterisation:
 
 ```fsharp
@@ -89,7 +89,7 @@ Db.Fetch(
     )
 ```
 
-### Writing Data
+## Writing Data
 Yasdal has support for a bulk insert wrapper. It takes a similar approach to writing as reading i.e. manually map between your F# rich types and the low level SQL columns. It uses a lightweight wrapper around `IDataReader` directly over your source data so you avoid the need for a `DataTable`, thus reducing memory and improving performance.
 
 ```fsharp
@@ -114,5 +114,5 @@ Db.BulkInsert(
 
 The `Column` module contains functions for working with the standard set of primitives, but a generic `make` method also exists that will infer the column type based on the result of the lambda expression (use with care).
 
-### Error Handling
+## Error Handling
 Yasal doesn't use Results (yet?). Instead, there are a few custom exceptions that wrap around low level ADO .NET exceptions for incorrect mappings etc.
