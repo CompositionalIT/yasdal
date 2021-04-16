@@ -22,49 +22,48 @@ module Exceptions =
 
 open Exceptions
 
-type DataReader (r:IDataReader) =
-    let readColumnBasic col thunk =
-        try thunk ()
+type IDataReader with
+    member inline private r.asMandatory mapper col =
+        try
+            r.GetOrdinal col |> mapper
         with
         | :? InvalidCastException as ex -> raise (ColumnMismatchException(col, ex))
         | :? IndexOutOfRangeException as ex -> raise (UnknownColumnException(col, ex))
         | :? SqlNullValueException as ex -> raise (ColumnNullException(col, ex))
-    let asMandatory mapper col =
-        readColumnBasic
-            col
-            (fun () -> r.GetOrdinal col |> mapper)
-    let asOptional mapper col =
-        readColumnBasic
-            col
-            (fun () ->
-                let index = r.GetOrdinal col
-                if r.IsDBNull index then None else Some(mapper index))
-
-    member _.RawReader = r
-    member _.char = asMandatory (r.GetString >> Seq.head)
-    member _.charOption = asOptional (r.GetString >> Seq.head)
-    member _.int = asMandatory r.GetInt32
-    member _.intOption = asOptional r.GetInt32
-    member _.int64 = asMandatory r.GetInt64
-    member _.int64Option = asOptional r.GetInt64
-    member _.decimal = asMandatory r.GetDecimal
-    member _.decimalOption = asOptional r.GetDecimal
-    member _.date = asMandatory r.GetDateTime
-    member _.dateOption = asOptional r.GetDateTime
-    member _.bool = asMandatory r.GetBoolean
-    member _.boolOption = asOptional r.GetBoolean
-    member _.float = asMandatory r.GetDouble
-    member _.floatOption = asOptional r.GetDouble
-    member _.guid = asMandatory r.GetGuid
-    member _.guidOption = asOptional r.GetGuid
-    member _.string = asMandatory r.GetString
-    member _.stringOption = asOptional r.GetString
+    
+    member inline private r.asOptional mapper col =
+        try
+            let index = r.GetOrdinal col
+            if r.IsDBNull index then None else Some(mapper index)
+        with
+        | :? InvalidCastException as ex -> raise (ColumnMismatchException(col, ex))
+        | :? IndexOutOfRangeException as ex -> raise (UnknownColumnException(col, ex))
+        | :? SqlNullValueException as ex -> raise (ColumnNullException(col, ex))
+    member r.char = r.asMandatory (r.GetString >> Seq.head)
+    member r.charOption = r.asOptional (r.GetString >> Seq.head)
+    member r.int = r.asMandatory r.GetInt32
+    member r.intOption = r.asOptional r.GetInt32
+    member r.int64 = r.asMandatory r.GetInt64
+    member r.int64Option = r.asOptional r.GetInt64
+    member r.decimal = r.asMandatory r.GetDecimal
+    member r.decimalOption = r.asOptional r.GetDecimal
+    member r.date = r.asMandatory r.GetDateTime
+    member r.dateOption = r.asOptional r.GetDateTime
+    member r.bool = r.asMandatory r.GetBoolean
+    member r.boolOption = r.asOptional r.GetBoolean
+    member r.float = r.asMandatory r.GetDouble
+    member r.floatOption = r.asOptional r.GetDouble
+    member r.guid = r.asMandatory r.GetGuid
+    member r.guidOption = r.asOptional r.GetGuid
+    member r.string = r.asMandatory r.GetString
+    member r.stringOption = r.asOptional r.GetString
 
 type private Common.DbDataReader with
-    member this.MapResults mapper = [|
+    member this.MapResults mapper =
+        let output = ResizeArray()
         while this.Read() do
-            yield DataReader this |> mapper
-    |]
+            output.Add (mapper (this :> IDataReader))
+        output
     member this.NextResultSet () = task {
         let! _ = this.NextResultAsync()
         return ()
@@ -74,7 +73,7 @@ type ResultSet<'a, 'b> =
     {
         Query : string
         Parameters : (string * 'b) array
-        Mapper : DataReader -> 'a
+        Mapper : IDataReader -> 'a
     }
 type ResultSet () =
     static member inline create (query, mapper, ?args:(string * #obj) array) = { Query = query; Parameters = defaultArg args [||]; Mapper = mapper }
@@ -94,7 +93,7 @@ type Db () =
             |> Array.map (fun (key, values) ->
                 let firstValue = values.[0]
                 if values |> Array.forall (fun v -> v = firstValue) then firstValue
-                else failwithf "Different params found with the same key %s" key)
+                else failwith $"Different params found with the same key '{key}'.")
             |> dict
         let combinedQuery = String.concat ";\n\n" queries
         conn.ExecuteReaderAsync (combinedQuery, dedupedParams, commandTimeout = 600)
@@ -106,10 +105,10 @@ type Db () =
         let transaction = Option.toObj transaction
         use! reader = connection.ExecuteReaderAsync(query, param = inputArgs, transaction = transaction, commandTimeout = timeout)
 
-        return [|
-            while reader.Read() do
-                yield DataReader reader |> mapper
-        |]
+        let output = ResizeArray()
+        while reader.Read() do
+            output.Add (mapper reader)
+        return output
     }
 
     /// Fetches a collection of rows from the database.
@@ -124,7 +123,7 @@ type Db () =
         use! r = connection.ExecuteReaderAsync(query, Option.toObj inputArgs)
         return
             if not (r.Read()) then None
-            else Some (mapper (DataReader r))
+            else Some (mapper r)
     }
 
     /// Fetches a collection of rows in two result sets from the database.
